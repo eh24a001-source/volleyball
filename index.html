@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>バレーボール記録 - ボタンサイズ統一版</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f8f9fa; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; }
+        .container { background: white; padding: 15px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 95%; max-width: 800px; text-align: center; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        .nav-menu { display: flex; justify-content: space-around; background: #f0f0f0; padding: 10px; border-radius: 10px; margin-bottom: 20px; gap: 8px; }
+        .nav-btn { flex: 1; padding: 12px; font-size: 0.9rem; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-weight: bold; }
+        .nav-btn.current { background: #444; color: white; border-color: #444; }
+
+        /* サーブ画面：巨大ボタン */
+        .big-serve-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 200px 200px; gap: 15px; margin: 20px 0; }
+        .huge-btn { width: 100%; height: 100%; font-size: 2rem; font-weight: bold; border-radius: 20px; border: 4px solid; cursor: pointer; }
+        .btn-ace { background-color: #e6ffed; border-color: #28a745; color: #28a745; }
+        .btn-effect { background-color: #fff9e6; border-color: #ffc107; color: #856404; }
+        .btn-miss { background-color: #fff5f5; border-color: #dc3545; color: #dc3545; }
+        .btn-normal { background-color: #eef6ff; border-color: #007AFF; color: #007AFF; }
+
+        /* 共通グリッド：3列 */
+        .button-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+        .player-box { padding: 10px; border: 1px solid #eee; border-radius: 10px; background: #fff; display: flex; flex-direction: column; align-items: center; }
+        
+        /* ボタンサイズの統一設定 */
+        .char-btn, .spike-btn, .opp-btn { 
+            width: 100%; 
+            height: 80px; /* 全ての記録ボタンの高さを統一 */
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            border: 2px solid #ddd; 
+            border-radius: 15px; 
+            background: white; 
+            cursor: pointer;
+        }
+
+        /* 相手ミスボタン専用カラー（赤の点線） */
+        .opp-btn { border: 2px dashed #dc3545; color: #dc3545; font-size: 0.9rem; }
+
+        .main-action-btn { width: 100%; padding: 20px; font-size: 1.3rem; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
+        .btn-purple { background: #6f42c1; color: white; border: none; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; }
+
+        table { border-collapse: collapse; width: 100%; margin-top: 25px; font-size: 0.7rem; }
+        th, td { border: 1px solid #ddd; padding: 5px 2px; text-align: center; }
+        th { background: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="screen-setup" class="screen active">
+        <h2>選手名設定</h2>
+        <div class="setup-grid" id="setup-inputs" style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;"></div>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="main-action-btn" style="background:#007AFF; flex:1" onclick="startGame('serve')">サーブ開始</button>
+            <button class="main-action-btn" style="background:#ff9800; flex:1" onclick="startGame('receive')">レシーブ開始</button>
+        </div>
+    </div>
+
+    <div id="nav-container" class="nav-menu" style="display:none;">
+        <button id="nav-serve" class="nav-btn" onclick="showScreen('screen-serve')">サーブ</button>
+        <button id="nav-catch" class="nav-btn" onclick="showScreen('screen-catch')">レシーブ</button>
+        <button id="nav-spike" class="nav-btn" onclick="showScreen('screen-spike')">スパイク</button>
+    </div>
+
+    <div id="screen-serve" class="screen">
+        <h3 id="serve-title">サーバー: -</h3>
+        <div id="ps-indicator" style="color:#6f42c1; font-weight:bold; display:none;">【交代中】</div>
+        <div class="big-serve-grid">
+            <button class="huge-btn btn-ace" onclick="recordServe('ace')">エース</button>
+            <button class="huge-btn btn-effect" onclick="recordServe('effect')">効果</button>
+            <button class="huge-btn btn-miss" onclick="recordServe('miss')">失点</button>
+            <button class="huge-btn btn-normal" onclick="recordServe('normal')">打つ</button>
+        </div>
+        <button class="btn-purple" style="opacity:0.8" onclick="showScreen('screen-ps-input')">PS投入</button>
+    </div>
+
+    <div id="screen-catch" class="screen">
+        <h3>レシーブ</h3>
+        <div class="button-grid">
+            <div id="catch-players-container" style="display:contents;"></div>
+
+            <div class="player-box">
+                <span style="font-size:0.7rem; color:#dc3545; font-weight:bold;">相手ミス</span>
+                <button class="opp-btn" id="opp-miss-btn" onclick="recordOppMiss()">
+                    サーブ<br><span id="opp-miss-count">0</span>回
+                </button>
+            </div>
+        </div>
+        <button id="catch-done-btn" class="main-action-btn" style="background:#ff9800">レシーブ完了</button>
+    </div>
+
+    <div id="screen-spike" class="screen">
+        <h3>スパイク</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button id="spike-win" class="main-action-btn" style="background:#28a745; flex:1" onclick="setSpikeMode('win')">決まった</button>
+            <button id="spike-fail" class="main-action-btn" style="background:#dc3545; flex:1" onclick="setSpikeMode('fail')">失敗</button>
+        </div>
+        <div class="button-grid" id="spike-grid"></div>
+        <button onclick="showScreen('screen-serve')" class="main-action-btn" style="background:#666">継続（ラリー中）</button>
+    </div>
+
+    <div id="screen-ps-input" class="screen">
+        <h2>PS登録</h2>
+        <input type="text" id="ps-name-field" style="width:80%; padding:10px; font-size:1.2rem;">
+        <button class="btn-purple" style="margin-top:20px" onclick="confirmPS()">登録</button>
+        <button onclick="showScreen('screen-serve')" style="margin-top:10px; border:none; background:none;">キャンセル</button>
+    </div>
+
+    <table id="main-stats-table" style="display:none;">
+        <thead>
+            <tr><th rowspan="2">名前</th><th colspan="4">サーブ</th><th colspan="5">レシーブ</th><th colspan="3">スパイク</th></tr>
+            <tr style="background:#f9f9f9; font-size:0.5rem;"><td>打</td><td>エ</td><td>効</td><td>失</td><td>受</td><td>A</td><td>B</td><td>C</td><td>失</td><td>決</td><td>失</td><td>総</td></tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+    </table>
+</div>
+
+<script>
+    const playerCount = 7;
+    const setupPlaceholders = ["1", "2", "3", "4", "5", "6", "リベロ"];
+    const serveOrder = [5, 2, 1, 0, 3, 4]; 
+    const tableDisplayOrder = [...serveOrder, 6]; 
+
+    let currentServerIdx = 0;
+    let isPSActive = false;
+    let psList = [];
+    let oppServeMissCount = 0;
+    let stats = Array.from({ length: playerCount }, () => createStatObj(""));
+
+    function createStatObj(name) {
+        return { name, serve: { total:0, ace:0, effect:0, miss:0 }, receive: { total:0, A:0, B:0, C:0, fail:0 }, spike: { win:0, fail:0, total:0 } };
+    }
+
+    const setupInputs = document.getElementById('setup-inputs');
+    for (let i = 0; i < playerCount; i++) {
+        setupInputs.innerHTML += `<div style="border:1px solid #eee; padding:5px; border-radius:8px;">选手${i+1}<br><input type="text" style="width:80%" placeholder="${setupPlaceholders[i]}" id="setup-name-${i}"></div>`;
+        
+        // レシーブボタン生成（コンテナ内）
+        document.getElementById('catch-players-container').innerHTML += `
+            <div class="player-box">
+                <span style="font-size:0.7rem;" id="clbl-${i}"></span>
+                <button class="char-btn" id="cbtn-${i}" onclick="toggleCatchBtn(${i})">-</button>
+            </div>`;
+        
+        // スパイクボタン生成
+        document.getElementById('spike-grid').innerHTML += `
+            <div class="player-box">
+                <span style="font-size:0.7rem;" id="slbl-${i}"></span>
+                <button class="spike-btn" id="sbtn-${i}" onclick="handleSpikeClick(${i})">0</button>
+            </div>`;
+    }
+
+    function startGame(mode) {
+        for (let i = 0; i < playerCount; i++) {
+            stats[i].name = document.getElementById(`setup-name-${i}`).value || setupPlaceholders[i];
+            document.getElementById(`clbl-${i}`).innerText = stats[i].name;
+            document.getElementById(`slbl-${i}`).innerText = stats[i].name;
+        }
+        refreshTable();
+        document.getElementById('screen-setup').classList.remove('active');
+        document.getElementById('nav-container').style.display = 'flex';
+        document.getElementById('main-stats-table').style.display = 'table';
+        showScreen(mode === 'serve' ? 'screen-serve' : 'screen-catch');
+        updateServeTitle();
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('current'));
+        if(id === 'screen-serve') document.getElementById('nav-serve').classList.add('current');
+        if(id === 'screen-catch') document.getElementById('nav-catch').classList.add('current');
+        if(id === 'screen-spike') document.getElementById('nav-spike').classList.add('current');
+    }
+
+    function updateServeTitle() {
+        const pIdx = serveOrder[currentServerIdx];
+        const serverName = isPSActive ? psList[psList.length-1].name : stats[pIdx].name;
+        document.getElementById('serve-title').innerText = `サーバー: ${serverName}`;
+        document.getElementById('ps-indicator').style.display = isPSActive ? 'block' : 'none';
+    }
+
+    window.recordServe = (type) => {
+        const curStats = isPSActive ? psList[psList.length-1] : stats[serveOrder[currentServerIdx]];
+        const prefix = isPSActive ? `ps${psList.length-1}` : `p${serveOrder[currentServerIdx]}`;
+        curStats.serve.total++;
+        if(type === 'ace') curStats.serve.ace++;
+        if(type === 'effect') curStats.serve.effect++;
+        if(type === 'miss') curStats.serve.miss++;
+        syncRow(prefix, curStats);
+        if(type === 'normal') showScreen('screen-spike');
+        else if(type === 'miss') {
+            isPSActive = false;
+            currentServerIdx = (currentServerIdx + 1) % serveOrder.length; 
+            updateServeTitle(); 
+            showScreen('screen-catch');
+        }
+    };
+
+    window.recordOppMiss = () => {
+        oppServeMissCount++;
+        document.getElementById('opp-miss-count').innerText = oppServeMissCount;
+        showScreen('screen-serve');
+    };
+
+    const catchOptions = ['-', 'A', 'B', 'C', '失敗'];
+    window.toggleCatchBtn = (i) => {
+        const btn = document.getElementById(`cbtn-${i}`);
+        let idx = catchOptions.indexOf(btn.innerText);
+        btn.innerText = catchOptions[(idx + 1) % catchOptions.length];
+        btn.style.borderColor = (btn.innerText === '失敗') ? '#dc3545' : (btn.innerText !== '-') ? '#007AFF' : '#ddd';
+    };
+
+    document.getElementById('catch-done-btn').onclick = () => {
+        for(let i=0; i<playerCount; i++){
+            const btn = document.getElementById(`cbtn-${i}`);
+            if(btn.innerText !== '-') {
+                stats[i].receive.total++;
+                if(btn.innerText==='A') stats[i].receive.A++;
+                if(btn.innerText==='B') stats[i].receive.B++;
+                if(btn.innerText==='C') stats[i].receive.C++;
+                if(btn.innerText==='失敗') stats[i].receive.fail++;
+                syncRow(`p${i}`, stats[i]);
+            }
+            btn.innerText = '-'; btn.style.borderColor = '#ddd';
+        }
+        showScreen('screen-spike');
+    };
+
+    let spikeMode = 'normal';
+    window.setSpikeMode = (mode) => {
+        spikeMode = (spikeMode === mode ? 'normal' : mode);
+        document.getElementById('spike-win').style.opacity = (spikeMode === 'win' || spikeMode === 'normal') ? '1' : '0.4';
+        document.getElementById('spike-fail').style.opacity = (spikeMode === 'fail' || spikeMode === 'normal') ? '1' : '0.4';
+    };
+
+    window.handleSpikeClick = (i) => {
+        stats[i].spike.total++;
+        if(spikeMode==='win') stats[i].spike.win++;
+        if(spikeMode==='fail') stats[i].spike.fail++;
+        syncRow(`p${i}`, stats[i]);
+        document.getElementById(`sbtn-${i}`).innerText = stats[i].spike.total;
+        const lastMode = spikeMode;
+        spikeMode = 'normal'; setSpikeMode('normal');
+        if(lastMode === 'win') showScreen('screen-serve');
+        else if(lastMode === 'fail') {
+            isPSActive = false;
+            currentServerIdx = (currentServerIdx + 1) % serveOrder.length; 
+            updateServeTitle(); 
+            showScreen('screen-catch'); 
+        }
+    };
+
+    function refreshTable() {
+        const tableBody = document.getElementById('table-body');
+        tableBody.innerHTML = "";
+        tableDisplayOrder.forEach(i => {
+            tableBody.innerHTML += `<tr id="row-p${i}"><td>${stats[i].name}</td><td id="p${i}-sT">0</td><td id="p${i}-sA">0</td><td id="p${i}-sE">0</td><td id="p${i}-sM">0</td><td id="p${i}-rT">0</td><td id="p${i}-rA">0</td><td id="p${i}-rB">0</td><td id="p${i}-rC">0</td><td id="p${i}-rF">0</td><td id="p${i}-spW">0</td><td id="p${i}-spF">0</td><td id="p${i}-spT">0</td></tr>`;
+        });
+    }
+
+    function syncRow(pre, data) {
+        document.getElementById(`${pre}-sT`).innerText = data.serve.total;
+        document.getElementById(`${pre}-sA`).innerText = data.serve.ace;
+        document.getElementById(`${pre}-sE`).innerText = data.serve.effect;
+        document.getElementById(`${pre}-sM`).innerText = data.serve.miss;
+        document.getElementById(`${pre}-rT`).innerText = data.receive.total;
+        document.getElementById(`${pre}-rA`).innerText = data.receive.A;
+        document.getElementById(`${pre}-rB`).innerText = data.receive.B;
+        document.getElementById(`${pre}-rC`).innerText = data.receive.C;
+        document.getElementById(`${pre}-rF`).innerText = data.receive.fail;
+        document.getElementById(`${pre}-spW`).innerText = data.spike.win;
+        document.getElementById(`${pre}-spF`).innerText = data.spike.fail;
+        document.getElementById(`${pre}-spT`).innerText = data.spike.total;
+    }
+
+    function confirmPS() {
+        const psName = document.getElementById('ps-name-field').value || "PS";
+        const newPS = createStatObj(psName);
+        psList.push(newPS);
+        isPSActive = true;
+        const id = psList.length - 1;
+        document.getElementById('table-body').innerHTML += `<tr class="ps-row" id="row-ps${id}"><td>${psName}</td><td id="ps${id}-sT">0</td><td id="ps${id}-sA">0</td><td id="ps${id}-sE">0</td><td id="ps${id}-sM">0</td><td id="ps${id}-rT">0</td><td id="ps${id}-rA">0</td><td id="ps${id}-rB">0</td><td id="ps${id}-rC">0</td><td id="ps${id}-rF">0</td><td id="ps${id}-spW">0</td><td id="ps${id}-spF">0</td><td id="ps${id}-spT">0</td></tr>`;
+        showScreen('screen-serve');
+        updateServeTitle();
+    }
+</script>
+</body>
+</html>
