@@ -19,10 +19,10 @@
         .score-timeline { width: 100%; overflow-x: auto; background: #fff; border: 1px solid #ccc; border-radius: 10px; margin: 15px 0; padding: 10px 0; white-space: nowrap; }
         .timeline-row { display: flex; align-items: center; min-height: 40px; padding: 0 10px; }
         .row-label { min-width: 85px; font-size: 0.75rem; font-weight: bold; position: sticky; left: 0; background: #fff; z-index: 5; border-right: 2px solid #eee; text-align: center; }
-        .point-dot { min-width: 26px; height: 26px; border-radius: 50%; margin: 0 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; color: white; font-weight: bold; flex-shrink: 0; }
+        .point-dot { min-width: 15px; height: 15px; border-radius: 50%; margin: 0 1px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.5rem; color: white; font-weight: bold; flex-shrink: 0; }
         .dot-ours { background-color: #28a745; border: 2px solid #1e7e34; }
         .dot-opp { background-color: #dc3545; border: 2px solid #bd2130; }
-        .spacer { min-width: 34px; flex-shrink: 0; }
+        .spacer { min-width: 15px; flex-shrink: 0; }
         .button-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
         .char-btn { width: 100%; height: 75px; font-size: 0.95rem; font-weight: bold; border: 1px solid #ddd; border-radius: 12px; cursor: pointer; background: white; }
         .main-action-btn { width: 100%; padding: 18px; font-size: 1rem; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
@@ -74,8 +74,8 @@
             <h3>コート背番号入力</h3>
             <div id="court-selection" class="button-grid"></div>
         </div>
-        <button class="main-action-btn" style="background:#007AFF" onclick="startSet('serve')">自チームサーブ開始</button>
-        <button class="main-action-btn" style="background:#ff9800" onclick="startSet('receive')">相手サーブ開始</button>
+        <button class="main-action-btn" style="background:#007AFF" onclick="startSet('serve')">サーブから</button>
+        <button class="main-action-btn" style="background:#ff9800" onclick="startSet('receive')">レシーブから</button>
     </div>
 
     <div id="record-area" style="display:none;" class="hide-on-print">
@@ -94,13 +94,13 @@
                 <button class="char-btn" style="border-color:#ffc107;" onclick="recordServe('effect')">効果</button>
                 <button class="char-btn" style="border-color:#dc3545;" onclick="recordServe('miss')">ミス</button>
             </div>
-            <button class="main-action-btn" style="background:#007AFF" onclick="recordServe('normal')">打つ (ラリーへ)</button>
+            <button class="main-action-btn" style="background:#007AFF" onclick="recordServe('normal')">効果なし</button>
         </div>
 
         <div id="screen-catch" class="screen">
-            <h3>レシーブ評価</h3>
+            <h3>サーブレシーブ</h3>
             <div class="button-grid" id="catch-players"></div>
-            <button class="main-action-btn" style="background:#ff9800" onclick="completeReceive()">レシーブ完了</button>
+            <button class="main-action-btn" style="background:#ff9800" onclick="completeReceive()">完了</button>
             <div class="button-grid">
                 <button class="char-btn" style="color:#28a745;" onclick="recordOppServeMiss()">相手サーブミス</button>
                 <button class="char-btn" style="color:#dc3545;" onclick="recordOppAce()">相手エース</button>
@@ -292,7 +292,7 @@
         let html = `<table><thead>
             <tr><th rowspan="2">名前</th><th colspan="5">サーブ</th><th colspan="5">レシーブ</th><th colspan="6">スパイク</th><th>B</th></tr>
             <tr style="font-size:0.5rem;">
-                <td>計</td><td>エ</td><td>効</td><td>失</td><td>効果率</td>
+                <td>計</td><td>A</td><td>効</td><td>失</td><td>効果率</td>
                 <td>A</td><td>B</td><td>C</td><td>失</td><td>成功率</td>
                 <td>決</td><td>失</td><td>計</td><td>バック</td><td>2段</td><td>効果率</td><td>得点</td>
             </tr>
