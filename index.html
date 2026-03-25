@@ -3,24 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>バレーボール分析レポートシステム - 完全版</title>
+    <title>バレーボール分析レポートシステム</title>
     <style>
+        /* スタイルはすべて維持 */
         body { font-family: sans-serif; background-color: #f8f9fa; display: flex; flex-direction: column; align-items: center; padding: 10px; margin: 0; padding-bottom: 140px; }
-        .container { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 95%; max-width: 1100px; text-align: center; }
+        .container { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 95%; max-width: 1200px; text-align: center; }
         .screen { display: none; }
         .screen.active { display: block; }
-
-        /* 入力フォーム */
         .setup-box { background:#fff; border:1px solid #ddd; padding:20px; border-radius:12px; margin-bottom:20px; text-align: left; }
         .setup-box label { display: block; margin-top: 10px; font-weight: bold; }
         .setup-box input { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-
-        /* ナビゲーション */
-        .nav-tabs { display: none; width: 100%; gap: 5px; margin-bottom: 15px; background: #eee; padding: 5px; border-radius: 10px; }
+        .nav-tabs { display: flex; width: 100%; gap: 5px; margin-bottom: 15px; background: #eee; padding: 5px; border-radius: 10px; }
         .nav-tabs button { flex: 1; padding: 10px; border: none; border-radius: 5px; font-weight: bold; background: #ddd; cursor: pointer; font-size: 0.75rem; }
-        .nav-tabs button.active-tab { background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-
-        /* スコア推移 */
+        .nav-tabs button.active { background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .score-timeline { width: 100%; overflow-x: auto; background: #fff; border: 1px solid #ccc; border-radius: 10px; margin: 15px 0; padding: 10px 0; white-space: nowrap; }
         .timeline-row { display: flex; align-items: center; min-height: 40px; padding: 0 10px; }
         .row-label { min-width: 85px; font-size: 0.75rem; font-weight: bold; position: sticky; left: 0; background: #fff; z-index: 5; border-right: 2px solid #eee; text-align: center; }
@@ -28,36 +23,30 @@
         .dot-ours { background-color: #28a745; border: 2px solid #1e7e34; }
         .dot-opp { background-color: #dc3545; border: 2px solid #bd2130; }
         .spacer { min-width: 34px; flex-shrink: 0; }
-
-        /* ボタンUI */
         .button-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
         .char-btn { width: 100%; height: 75px; font-size: 0.95rem; font-weight: bold; border: 1px solid #ddd; border-radius: 12px; cursor: pointer; background: white; }
         .main-action-btn { width: 100%; padding: 18px; font-size: 1rem; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
-        .active-mode { border: 4px solid #000 !important; transform: scale(1.05); }
         .btn-undo { width: 100%; background: #6c757d; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 10px; }
-        
-        .spike-btn-front { background: white; color: black; border: 1px solid #ddd; }
-        .spike-btn-back { background: #e0e0e0; color: #333; border: 1px solid #bbb; }
-
-        /* テーブル */
         .table-wrapper { width: 100%; overflow-x: auto; margin-top: 20px; }
-        table { border-collapse: collapse; width: 100%; min-width: 1000px; font-size: 0.65rem; margin-bottom: 30px; }
+        table { border-collapse: collapse; width: 100%; min-width: 1100px; font-size: 0.65rem; margin-bottom: 30px; }
         th, td { border: 1px solid #ddd; padding: 4px 1px; text-align: center; }
         th { background: #444; color: white; }
         .calc-cell { background: #f0f7ff; font-weight: bold; }
-
-        /* 印刷設定 */
-        @media print {
-            .hide-on-print, .nav-tabs, .sticky-scoreboard, .btn-undo, .main-action-btn { display: none !important; }
-            body { background: white; padding: 0; margin: 0; }
-            .container { box-shadow: none; width: 100%; max-width: none; padding: 0; }
-            .table-wrapper { overflow: visible; }
-            table { min-width: auto; width: 100%; page-break-inside: avoid; }
-            .score-timeline { overflow: visible; white-space: normal; border: none; }
-        }
-
+        .edit-cell { color: #007AFF; font-weight: bold; cursor: pointer; text-decoration: underline; }
         .sticky-scoreboard { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 12px; display: flex; justify-content: space-around; align-items: center; z-index: 1000; }
-        #next-set-btn { display:none; background: #ff9800; color: white; }
+        @media print {
+            .hide-on-print, #record-area, .nav-tabs, .sticky-scoreboard, .main-action-btn, .btn-undo, #screen-game-setup, #screen-set-setup { display: none !important; }
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; width: 100%; }
+            table { min-width: auto; width: 100%; font-size: 0.75rem; page-break-inside: avoid; }
+            th { background: #eee !important; color: black !important; }
+        }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 30px; border-radius: 20px; text-align: center; min-width: 280px; box-shadow: 0 5px 25px rgba(0,0,0,0.2); }
+        .modal-value { font-size: 4rem; margin: 20px 0; font-weight: bold; }
+        .modal-btns { display: flex; justify-content: center; gap: 20px; margin-bottom: 25px; }
+        .count-btn { width: 85px; height: 85px; font-size: 2rem; border-radius: 15px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+        .close-btn { width: 100%; padding: 15px; background: #333; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -71,30 +60,31 @@
             <label>対戦相手名</label><input type="text" id="team-opp" placeholder="相手チーム">
         </div>
         <div class="setup-box">
-            <strong>選手名簿 (Excel貼り付け可)</strong><br>
-            <textarea id="paste-area" style="width:100%; height:80px; margin:10px 0;" placeholder="1 田中&#13;&#10;2 佐藤..."></textarea>
+            <strong>選手名簿</strong><br>
+            <textarea id="paste-area" style="width:100%; height:80px; margin:10px 0;" placeholder="1 田中..."></textarea>
             <button onclick="importFromPaste()">読み込み実行</button>
-            <div id="member-registry" class="button-grid" style="margin-top:10px; grid-template-columns: repeat(3, 1fr);"></div>
+            <div id="member-registry" class="button-grid" style="margin-top:10px;"></div>
         </div>
         <button class="main-action-btn" style="background:#28a745" onclick="showSetSetup()">次へ進む</button>
     </div>
 
     <div id="screen-set-setup" class="screen hide-on-print">
-        <h2 id="set-setup-title">第1セット 開始準備</h2>
+        <h2 id="set-setup-title">開始準備</h2>
         <div class="setup-box">
-            <h3>コート背番号入力 (選手1〜6, リベロ)</h3>
-            <div id="court-selection" class="button-grid" style="grid-template-columns: repeat(3, 1fr);"></div>
+            <h3>コート背番号入力</h3>
+            <div id="court-selection" class="button-grid"></div>
         </div>
         <button class="main-action-btn" style="background:#007AFF" onclick="startSet('serve')">自チームサーブ開始</button>
         <button class="main-action-btn" style="background:#ff9800" onclick="startSet('receive')">相手サーブ開始</button>
     </div>
 
-    <div id="record-area" class="hide-on-print" style="display:none;">
-        <div id="nav-tabs" class="nav-tabs">
+    <div id="record-area" style="display:none;" class="hide-on-print">
+        <div class="nav-tabs">
             <button id="tab-serve" onclick="showScreen('screen-serve')">サーブ</button>
             <button id="tab-catch" onclick="showScreen('screen-catch')">レシーブ</button>
             <button id="tab-spike" onclick="showScreen('screen-spike')">スパイク</button>
             <button id="tab-block" onclick="showScreen('screen-block')">ブロック</button>
+            <button id="tab-sub" style="background:#6c757d; color:white;" onclick="showSubScreen()">交代</button>
         </div>
 
         <div id="screen-serve" class="screen">
@@ -111,7 +101,10 @@
             <h3>レシーブ評価</h3>
             <div class="button-grid" id="catch-players"></div>
             <button class="main-action-btn" style="background:#ff9800" onclick="completeReceive()">レシーブ完了</button>
-            <button class="char-btn" style="color:#dc3545; width:100%;" onclick="recordOppAce()">相手エース</button>
+            <div class="button-grid">
+                <button class="char-btn" style="color:#28a745;" onclick="recordOppServeMiss()">相手サーブミス</button>
+                <button class="char-btn" style="color:#dc3545;" onclick="recordOppAce()">相手エース</button>
+            </div>
         </div>
 
         <div id="screen-spike" class="screen">
@@ -121,7 +114,7 @@
                 <button id="mode-fail" class="main-action-btn" style="background:#dc3545; flex:1;" onclick="setSpikeMode('fail')">ミス</button>
                 <button id="mode-two-step" class="main-action-btn" style="background:#ff9800; flex:1;" onclick="toggleTwoStep()">2段</button>
             </div>
-            <div class="button-grid" id="spike-grid"></div>
+            <div id="spike-grid" class="button-grid"></div>
             <div class="button-grid">
                 <button class="char-btn" style="color:#28a745;" onclick="score(true); showScreen('screen-serve')">相手ミス</button>
                 <button class="char-btn" style="color:#dc3545;" onclick="score(false); showScreen('screen-catch')">相手得点</button>
@@ -129,18 +122,28 @@
         </div>
 
         <div id="screen-block" class="screen">
-            <h3>ブロック得点（前衛のみ）</h3>
-            <div class="button-grid" id="block-grid"></div>
+            <h3>ブロック得点</h3>
+            <div id="block-grid" class="button-grid"></div>
+        </div>
+
+        <div id="screen-sub" class="screen">
+            <h3>選手交代</h3>
+            <div id="sub-out-grid" class="button-grid"></div>
+            <div id="sub-in-section" style="display:none; margin-top:20px; border-top:2px solid #ddd; padding-top:20px;">
+                <h3 id="sub-in-title">入る選手を選択</h3>
+                <div id="sub-in-grid" class="button-grid"></div>
+            </div>
         </div>
         
-        <button id="next-set-btn" class="main-action-btn" onclick="finishSet()">このセットを終了して次へ</button>
+        <button id="next-set-btn" class="main-action-btn" style="background:#000; display:none;" onclick="finishSet()">このセットを終了</button>
         <button class="btn-undo" onclick="undo()">１つ戻る</button>
     </div>
 
     <div id="report-section">
         <div id="game-summary" style="text-align:left;"></div>
         <div id="set-results-container"></div>
-        <button id="pdf-btn" class="main-action-btn hide-on-print" style="background:#555; display:none; margin-top:20px;" onclick="window.print()">📊 PDFとして保存 / 印刷</button>
+        <div id="total-results-container" style="margin-top:50px;"></div>
+        <button id="pdf-btn" class="main-action-btn hide-on-print" style="background:#555; display:none; margin-top:20px;" onclick="window.print()">📊 PDF保存 / 印刷</button>
     </div>
 </div>
 
@@ -150,15 +153,28 @@
     <div style="font-size:2rem; font-weight:bold;" id="opp-score">0</div>
 </div>
 
-<script>
-    let allSetsData = [], currentSetNum = 1, setWinOurs = 0, setWinOpp = 0;
-    let stats = [], courtMembers = [-1,-1,-1,-1,-1,-1,-1], history = [];
-    let ourScore = 0, oppScore = 0, currentServerIdx = 5, hasServeRight = true, spikeMode = 'normal', isTwoStepMode = false;
-    
-    const serveOrder = [2, 1, 0, 3, 4, 5]; 
-    const posNames = ["選手1", "選手2", "選手3", "選手4", "選手5", "選手6", "リベロ"];
+<div class="modal-overlay" id="edit-modal">
+    <div class="modal-content">
+        <h3 id="m-player-name"></h3>
+        <p id="m-item-name"></p>
+        <div class="modal-value" id="m-current-val">0</div>
+        <div class="modal-btns">
+            <button class="count-btn" onclick="adjustVal(-1)">-1</button>
+            <button class="count-btn" onclick="adjustVal(1)">+1</button>
+        </div>
+        <button class="close-btn" onclick="closeModal()">閉じる</button>
+    </div>
+</div>
 
-    // 初期化
+<script>
+    let playerMaster = [], allSetsData = [], currentSetNum = 1, setWinOurs = 0, setWinOpp = 0;
+    let currentSetStats = [], courtMembers = [-1,-1,-1,-1,-1,-1,-1];
+    let ourScore = 0, oppScore = 0, currentServerIdx = 5, hasServeRight = true, spikeMode = 'normal', isTwoStepMode = false;
+    let oppServeMissCount = 0, actionHistory = [];
+
+    const serveOrder = [2, 1, 0, 3, 4, 5], posNames = ["選手1", "選手2", "選手3", "選手4", "選手5", "選手6", "リベロ"];
+
+    // 選手名簿初期化
     const regDiv = document.getElementById('member-registry');
     for(let i=0; i<15; i++) regDiv.innerHTML += `<div><input type="number" class="reg-no" style="width:35px;"><input type="text" class="reg-name" style="width:75px;"></div>`;
     const courtDiv = document.getElementById('court-selection');
@@ -181,31 +197,43 @@
         document.getElementById('set-setup-title').innerText = `第${currentSetNum}セット 開始準備`;
     }
 
+    function createEmptyStats() {
+        return playerMaster.map(p => ({
+            no: p.no, name: p.name,
+            serve:{total:0, ace:0, effect:0, miss:0},
+            receive:{total:0, A:0, B:0, C:0, fail:0},
+            spike:{win:0, fail:0, total:0, backCount:0},
+            twoStep:{win:0, fail:0, total:0},
+            block:{win:0}
+        }));
+    }
+
     function startSet(mode) {
         if(allSetsData.length === 0) {
-            stats = [];
+            playerMaster = [];
             document.querySelectorAll('.reg-no').forEach((el, i) => {
                 const no = el.value, name = document.querySelectorAll('.reg-name')[i].value || `No.${no}`;
-                if(no) stats.push({ no, name, serve:{total:0, ace:0, effect:0, miss:0}, receive:{total:0, A:0, B:0, C:0, fail:0}, spike:{win:0, fail:0, total:0, backCount:0}, twoStep:{win:0, fail:0, total:0}, block:{win:0} });
+                if(no) playerMaster.push({ no, name });
             });
-        } else {
-            stats = stats.map(s => ({...s, serve:{total:0, ace:0, effect:0, miss:0}, receive:{total:0, A:0, B:0, C:0, fail:0}, spike:{win:0, fail:0, total:0, backCount:0}, twoStep:{win:0, fail:0, total:0}, block:{win:0}}));
         }
+        // 重要：新しいセットが始まるたびにスタッツをゼロリセット
+        currentSetStats = createEmptyStats();
+        oppServeMissCount = 0;
+        actionHistory = [];
 
-        document.querySelectorAll('.court-no').forEach((el, i) => {
-            courtMembers[i] = stats.findIndex(s => s.no == el.value);
+        document.querySelectorAll('.court-no').forEach((el, i) => { 
+            courtMembers[i] = playerMaster.findIndex(p => p.no == el.value); 
         });
 
         ourScore = 0; oppScore = 0; hasServeRight = (mode === 'serve'); currentServerIdx = 5;
         document.getElementById('screen-set-setup').classList.remove('active');
         document.getElementById('record-area').style.display = 'block';
-        document.getElementById('nav-tabs').style.display = 'flex';
         document.getElementById('scoreboard').style.display = 'flex';
         document.getElementById('pdf-btn').style.display = 'block';
 
         const tlId = `timeline-set-${currentSetNum}`;
         document.getElementById('set-results-container').innerHTML += `
-            <div id="container-${tlId}">
+            <div id="container-${tlId}" style="page-break-after: always;">
                 <h3 style="margin-top:30px; border-left:5px solid #333; padding-left:10px;">第${currentSetNum}セット</h3>
                 <div class="score-timeline">
                     <div class="timeline-row" id="ours-${tlId}"><div class="row-label">自チーム</div></div>
@@ -213,133 +241,107 @@
                 </div>
                 <div id="table-${tlId}" class="table-wrapper"></div>
             </div>`;
-
-        updateUI();
-        refreshInterface();
+        updateUI(); refreshInterface(); renderTable(`table-${tlId}`, currentSetStats, oppServeMissCount);
         showScreen(hasServeRight ? 'screen-serve' : 'screen-catch');
-    }
-
-    function saveState(scr) { history.push({ ourScore, oppScore, currentServerIdx, hasServeRight, stats: JSON.parse(JSON.stringify(stats)), courtMembers: [...courtMembers], screen: scr, timelineOurs: document.getElementById(`ours-timeline-set-${currentSetNum}`).innerHTML, timelineOpp: document.getElementById(`opp-timeline-set-${currentSetNum}`).innerHTML }); }
-
-    function score(ours) {
-        if(ours) { ourScore++; if(!hasServeRight) { currentServerIdx = (currentServerIdx + 1) % 6; hasServeRight = true; } }
-        else { oppScore++; hasServeRight = false; }
-        updateUI(); updateTimeline(ours); checkSetEnd(); refreshInterface();
-    }
-
-    function updateTimeline(ours) {
-        const tlId = `timeline-set-${currentSetNum}`;
-        const dot = `<div class="point-dot ${ours ? 'dot-ours' : 'dot-opp'}">${ours ? ourScore : oppScore}</div>`;
-        document.getElementById(`ours-${tlId}`).innerHTML += ours ? dot : '<div class="spacer"></div>';
-        document.getElementById(`opp-${tlId}`).innerHTML += ours ? '<div class="spacer"></div>' : dot;
-    }
-
-    function checkSetEnd() {
-        const target = (currentSetNum === 5) ? 15 : 25;
-        const isEnd = (ourScore >= target || oppScore >= target) && Math.abs(ourScore - oppScore) >= 2;
-        document.getElementById('next-set-btn').style.display = isEnd ? 'block' : 'none';
-    }
-
-    function refreshInterface() {
-        const sd = document.getElementById('spike-grid'), cd = document.getElementById('catch-players'), bd = document.getElementById('block-grid');
-        sd.innerHTML = ""; cd.innerHTML = ""; bd.innerHTML = "";
-        
-        const frontIdxsInOrder = [(currentServerIdx + 1) % 6, (currentServerIdx + 2) % 6, (currentServerIdx + 3) % 6];
-        const frontCourtPos = frontIdxsInOrder.map(idx => serveOrder[idx]);
-
-        courtMembers.forEach((idx, i) => {
-            if(idx === -1) return;
-            const name = stats[idx].name;
-            const isFront = frontCourtPos.includes(i);
-            const isBack = (i === 6) || !isFront;
-
-            sd.innerHTML += `<button class="char-btn ${isBack ? 'spike-btn-back' : 'spike-btn-front'}" onclick="hitSpike(${i}, ${isBack})">${name}${isBack ? '<br><small>(Back)</small>' : ''}</button>`;
-            cd.innerHTML += `<button class="char-btn" id="cbtn-${i}" onclick="toggleRec(${i})">${name}</button>`;
-            if(isFront) bd.innerHTML += `<button class="char-btn" onclick="hitBlockPoint(${i})">${name}</button>`;
-        });
-        const sIdx = courtMembers[serveOrder[currentServerIdx]];
-        document.getElementById('serve-title').innerText = `サーバー: ${stats[sIdx] ? stats[sIdx].name : '-'}`;
-    }
-
-    function recordServe(type) {
-        const sIdx = courtMembers[serveOrder[currentServerIdx]];
-        stats[sIdx].serve.total++;
-        if(type === 'ace') { stats[sIdx].serve.ace++; score(true); showScreen('screen-serve'); }
-        else if(type === 'effect') { stats[sIdx].serve.effect++; showScreen('screen-spike'); }
-        else if(type === 'miss') { stats[sIdx].serve.miss++; score(false); showScreen('screen-catch'); }
-        else showScreen('screen-spike');
-    }
-
-    function toggleRec(pos) {
-        const btn = document.getElementById(`cbtn-${pos}`), sIdx = courtMembers[pos];
-        const opts = [stats[sIdx].name, 'A', 'B', 'C', '失'];
-        let idx = (opts.indexOf(btn.innerText) + 1) % opts.length;
-        btn.innerText = opts[idx];
-        btn.style.background = (opts[idx] === '失') ? '#ffcccc' : (opts[idx] !== stats[sIdx].name ? '#eef6ff' : 'white');
-    }
-
-    function completeReceive() {
-        courtMembers.forEach((idx, i) => {
-            const val = document.getElementById(`cbtn-${i}`).innerText;
-            if(val !== stats[idx].name) {
-                stats[idx].receive.total++;
-                if(val === 'A') stats[idx].receive.A++;
-                else if(val === 'B') stats[idx].receive.B++;
-                else if(val === 'C') stats[idx].receive.C++;
-                else if(val === '失') { stats[idx].receive.fail++; score(false); showScreen('screen-catch'); return; }
-            }
-        });
-        showScreen('screen-spike');
-    }
-
-    function hitSpike(pos, isBack) {
-        const sIdx = courtMembers[pos];
-        if(isTwoStepMode) {
-            stats[sIdx].twoStep.total++;
-            if(spikeMode === 'win') { stats[sIdx].twoStep.win++; score(true); showScreen('screen-serve'); }
-            else if(spikeMode === 'fail') { stats[sIdx].twoStep.fail++; score(false); showScreen('screen-catch'); }
-        } else {
-            stats[sIdx].spike.total++;
-            if(isBack) stats[sIdx].spike.backCount++;
-            if(spikeMode === 'win') { stats[sIdx].spike.win++; score(true); showScreen('screen-serve'); }
-            else if(spikeMode === 'fail') { stats[sIdx].spike.fail++; score(false); showScreen('screen-catch'); }
-        }
-        spikeMode = 'normal'; isTwoStepMode = false; updateSpikeModeUI();
     }
 
     function finishSet() {
         if(ourScore > oppScore) setWinOurs++; else setWinOpp++;
-        allSetsData.push({ setNum: currentSetNum, score: {ours: ourScore, opp: oppScore}, stats: JSON.parse(JSON.stringify(stats)) });
-        renderSetTable(currentSetNum);
-        if(setWinOurs === 3 || setWinOpp === 3 || currentSetNum === 5) finalizeGame();
-        else { currentSetNum++; document.getElementById('record-area').style.display = 'none'; showSetSetup(); }
-    }
-
-    function renderSetTable(num) {
-        const data = allSetsData[num-1];
-        let html = `<table><thead><tr><th>名前</th><th colspan="5">サーブ</th><th colspan="6">レシーブ</th><th colspan="3">スパイク</th><th>B</th></tr><tr style="font-size:0.5rem;"><td></td><td>計</td><td>エ</td><td>効</td><td>失</td><td>率</td><td>計</td><td>A</td><td>B</td><td>C</td><td>失</td><td>率</td><td>決</td><td>失</td><td>率</td><td>得</td></tr></thead><tbody>`;
-        data.stats.forEach(p => {
-            const sEff = p.serve.total ? (((p.serve.ace * 100) + (p.serve.effect * 25) - (p.serve.miss * 25)) / p.serve.total).toFixed(1) : "0.0";
-            const rSuc = p.receive.total ? (((p.receive.A * 100) + (p.receive.B * 50)) / p.receive.total).toFixed(1) : "0.0";
-            const spEff = p.spike.total ? ((p.spike.win - p.spike.fail) / p.spike.total).toFixed(2) : "0.00";
-            html += `<tr><td>${p.name}</td><td>${p.serve.total}</td><td>${p.serve.ace}</td><td>${p.serve.effect}</td><td>${p.serve.miss}</td><td class="calc-cell">${sEff}%</td><td>${p.receive.total}</td><td>${p.receive.A}</td><td>${p.receive.B}</td><td>${p.receive.C}</td><td>${p.receive.fail}</td><td class="calc-cell">${rSuc}%</td><td>${p.spike.win}</td><td>${p.spike.fail}</td><td class="calc-cell">${spEff}</td><td>${p.block.win}</td></tr>`;
+        allSetsData.push({ 
+            setNum: currentSetNum, 
+            score: {ours: ourScore, opp: oppScore}, 
+            stats: JSON.parse(JSON.stringify(currentSetStats)), 
+            oppMiss: oppServeMissCount 
         });
-        document.getElementById(`table-timeline-set-${num}`).innerHTML = html + `</tbody></table>`;
+
+        if(setWinOurs === 3 || setWinOpp === 3 || currentSetNum === 5) {
+            finalizeGame();
+        } else {
+            currentSetNum++;
+            document.getElementById('record-area').style.display = 'none';
+            showSetSetup();
+        }
     }
 
     function finalizeGame() {
         document.getElementById('record-area').style.display = 'none';
         document.getElementById('scoreboard').style.display = 'none';
+        
         const date = document.getElementById('game-date').value, tOurs = document.getElementById('team-ours').value, tOpp = document.getElementById('team-opp').value;
         document.getElementById('game-summary').innerHTML = `<h2>${date} 試合結果</h2><p style="font-size:1.5rem; font-weight:bold;">${tOurs} ${setWinOurs} - ${setWinOpp} ${tOpp}</p>`;
+
+        // 試合総計の算出
+        const totalStats = createEmptyStats();
+        let totalOppMiss = 0;
+        allSetsData.forEach(setData => {
+            totalOppMiss += setData.oppMiss;
+            setData.stats.forEach((s, i) => {
+                ['serve','receive','spike','twoStep','block'].forEach(key => {
+                    for(let sub in s[key]) totalStats[i][key][sub] += s[key][sub];
+                });
+            });
+        });
+
+        document.getElementById('total-results-container').innerHTML = `
+            <h2 style="margin-top:50px; border-bottom:3px solid #333;">試合総計 (TOTAL)</h2>
+            <div id="table-total" class="table-wrapper"></div>`;
+        renderTable("table-total", totalStats, totalOppMiss, true);
     }
 
-    function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+    function renderTable(containerId, statsData, oppMiss, isTotal = false) {
+        let html = `<table><thead>
+            <tr><th rowspan="2">名前</th><th colspan="5">サーブ</th><th colspan="5">レシーブ</th><th colspan="6">スパイク</th><th>B</th></tr>
+            <tr style="font-size:0.5rem;">
+                <td>計</td><td>エ</td><td>効</td><td>失</td><td>効果率</td>
+                <td>A</td><td>B</td><td>C</td><td>失</td><td>成功率</td>
+                <td>決</td><td>失</td><td>計</td><td>バック</td><td>2段</td><td>効果率</td><td>得点</td>
+            </tr>
+            </thead><tbody>`;
+        
+        statsData.forEach((p, i) => {
+            const svEff = p.serve.total ? ((p.serve.ace * 100 + p.serve.effect * 25 - p.serve.miss * 25) / p.serve.total).toFixed(1) : '0.0';
+            const rcRate = p.receive.total ? ((p.receive.A * 100 + p.receive.B * 50) / p.receive.total).toFixed(1) : '0.0';
+            const spEff = p.spike.total ? (((p.spike.win - p.spike.fail) / p.spike.total) * 100).toFixed(1) : '0.0';
+
+            html += `<tr><td>${p.name}</td>
+                ${isTotal ? td(p.serve.total) : c(i,'serve','total')}${isTotal ? td(p.serve.ace) : c(i,'serve','ace')}${isTotal ? td(p.serve.effect) : c(i,'serve','effect')}${isTotal ? td(p.serve.miss) : c(i,'serve','miss')}<td class="calc-cell">${svEff}%</td>
+                ${isTotal ? td(p.receive.A) : c(i,'receive','A')}${isTotal ? td(p.receive.B) : c(i,'receive','B')}${isTotal ? td(p.receive.C) : c(i,'receive','C')}${isTotal ? td(p.receive.fail) : c(i,'receive','fail')}<td class="calc-cell">${rcRate}%</td>
+                ${isTotal ? td(p.spike.win) : c(i,'spike','win')}${isTotal ? td(p.spike.fail) : c(i,'spike','fail')}${isTotal ? td(p.spike.total) : c(i,'spike','total')}${isTotal ? td(p.spike.backCount) : c(i,'spike','backCount')}${isTotal ? td(p.twoStep.total) : c(i,'twoStep','total')}<td class="calc-cell">${spEff}%</td>
+                ${isTotal ? td(p.block.win) : c(i,'block','win')}</tr>`;
+        });
+        html += `<tr style="background:#f9f9f9; font-weight:bold;"><td colspan="5">相手サーブミス</td><td class="${isTotal?'':'edit-cell'}" onclick="${isTotal?'':'openOppMissModal()'}">${oppMiss}</td><td colspan="11"></td></tr></tbody></table>`;
+        document.getElementById(containerId).innerHTML = html;
+    }
+
+    function c(idx, key, sub) { return `<td class="edit-cell" onclick="openModal(${idx},'${key}','${sub}')">${currentSetStats[idx][key][sub]}</td>`; }
+    function td(val) { return `<td>${val}</td>`; }
+
+    // --- 以降の全記録・操作ロジックは前のバージョンから完全継承 ---
+    function saveState() { actionHistory.push(JSON.stringify({ stats: currentSetStats, courtMembers, ourScore, oppScore, hasServeRight, currentServerIdx, oppServeMissCount })); if(actionHistory.length > 30) actionHistory.shift(); }
+    function undo() { if(actionHistory.length === 0) return; const last = JSON.parse(actionHistory.pop()); currentSetStats = last.stats; courtMembers = last.courtMembers; ourScore = last.ourScore; oppScore = last.oppScore; hasServeRight = last.hasServeRight; currentServerIdx = last.currentServerIdx; oppServeMissCount = last.oppServeMissCount; const tlId = `timeline-set-${currentSetNum}`; const ours = document.getElementById(`ours-${tlId}`), opp = document.getElementById(`opp-${tlId}`); if(ours.lastChild && ours.lastChild.className !== "row-label") { ours.removeChild(ours.lastChild); opp.removeChild(opp.lastChild); } updateUI(); refreshInterface(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
+    function score(ours) { saveState(); if(ours) { ourScore++; if(!hasServeRight) { currentServerIdx = (currentServerIdx + 1) % 6; hasServeRight = true; } } else { oppScore++; hasServeRight = false; } updateUI(); updateTimeline(ours); checkSetEnd(); refreshInterface(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
+    function updateTimeline(ours) { const tlId = `timeline-set-${currentSetNum}`; const dot = `<div class="point-dot ${ours ? 'dot-ours' : 'dot-opp'}">${ours ? ourScore : oppScore}</div>`; document.getElementById(`ours-${tlId}`).innerHTML += ours ? dot : '<div class="spacer"></div>'; document.getElementById(`opp-${tlId}`).innerHTML += ours ? '<div class="spacer"></div>' : dot; }
+    function recordServe(type) { saveState(); const sIdx = courtMembers[serveOrder[currentServerIdx]]; currentSetStats[sIdx].serve.total++; if(type === 'ace') { currentSetStats[sIdx].serve.ace++; score(true); showScreen('screen-serve'); } else if(type === 'effect') { currentSetStats[sIdx].serve.effect++; showScreen('screen-spike'); } else if(type === 'miss') { currentSetStats[sIdx].serve.miss++; score(false); showScreen('screen-catch'); } else showScreen('screen-spike'); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
+    function recordOppServeMiss() { saveState(); oppServeMissCount++; score(true); showScreen('screen-serve'); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
+    function recordOppAce() { saveState(); oppScore++; updateUI(); updateTimeline(false); checkSetEnd(); refreshInterface(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
+    function completeReceive() { saveState(); courtMembers.forEach((idx, i) => { const btn = document.getElementById(`cbtn-${i}`); if(!btn) return; const val = btn.innerText; if(val !== playerMaster[idx].name) { currentSetStats[idx].receive.total++; if(val === 'A') currentSetStats[idx].receive.A++; else if(val === 'B') currentSetStats[idx].receive.B++; else if(val === 'C') currentSetStats[idx].receive.C++; else if(val === '失') { currentSetStats[idx].receive.fail++; score(false); showScreen('screen-catch'); return; } } }); showScreen('screen-spike'); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
+    function hitSpike(pos, isBack) { saveState(); const sIdx = courtMembers[pos]; currentSetStats[sIdx].spike.total++; if(isBack) currentSetStats[sIdx].spike.backCount++; if(isTwoStepMode) { currentSetStats[sIdx].twoStep.total++; if(spikeMode === 'win') { currentSetStats[sIdx].twoStep.win++; score(true); showScreen('screen-serve'); } else if(spikeMode === 'fail') { currentSetStats[sIdx].twoStep.fail++; score(false); showScreen('screen-catch'); } } else { if(spikeMode === 'win') { currentSetStats[sIdx].spike.win++; score(true); showScreen('screen-serve'); } else if(spikeMode === 'fail') { currentSetStats[sIdx].spike.fail++; score(false); showScreen('screen-catch'); } } spikeMode = 'normal'; isTwoStepMode = false; updateSpikeModeUI(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
+    function hitBlockPoint(pos) { saveState(); currentSetStats[courtMembers[pos]].block.win++; score(true); showScreen('screen-serve'); }
+    function showSubScreen() { subOutPos = -1; document.getElementById('sub-in-section').style.display = 'none'; const outGrid = document.getElementById('sub-out-grid'); outGrid.innerHTML = ""; courtMembers.forEach((idx, i) => { if(idx !== -1) outGrid.innerHTML += `<button class="char-btn" onclick="selectSubOut(${i})">${posNames[i]}<br>${playerMaster[idx].name}</button>`; }); showScreen('screen-sub'); }
+    function selectSubOut(pos) { subOutPos = pos; document.getElementById('sub-in-section').style.display = 'block'; const inGrid = document.getElementById('sub-in-grid'); inGrid.innerHTML = ""; playerMaster.forEach((s, idx) => { if(!courtMembers.includes(idx)) inGrid.innerHTML += `<button class="char-btn" onclick="executeSub(${idx})">No.${s.no}<br>${s.name}</button>`; }); }
+    function executeSub(newIdx) { saveState(); courtMembers[subOutPos] = newIdx; refreshInterface(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); showScreen('screen-spike'); }
+    function refreshInterface() { const sd = document.getElementById('spike-grid'), cd = document.getElementById('catch-players'), bd = document.getElementById('block-grid'); sd.innerHTML = ""; cd.innerHTML = ""; bd.innerHTML = ""; const fIdxs = [(currentServerIdx + 1) % 6, (currentServerIdx + 2) % 6, (currentServerIdx + 3) % 6]; const fPos = fIdxs.map(idx => serveOrder[idx]); courtMembers.forEach((idx, i) => { if(idx === -1) return; const isBack = (i === 6) || !fPos.includes(i); sd.innerHTML += `<button class="char-btn" onclick="hitSpike(${i}, ${isBack})">${playerMaster[idx].name}${isBack ? '<br><small>(Back)</small>' : ''}</button>`; cd.innerHTML += `<button class="char-btn" id="cbtn-${i}" onclick="toggleRec(${i})">${playerMaster[idx].name}</button>`; if(!isBack) bd.innerHTML += `<button class="char-btn" onclick="hitBlockPoint(${i})">${playerMaster[idx].name}</button>`; }); document.getElementById('serve-title').innerText = `サーバー: ${playerMaster[courtMembers[serveOrder[currentServerIdx]]].name}`; }
+    function toggleRec(pos) { const btn = document.getElementById(`cbtn-${pos}`), name = playerMaster[courtMembers[pos]].name; const opts = [name, 'A', 'B', 'C', '失']; btn.innerText = opts[(opts.indexOf(btn.innerText) + 1) % opts.length]; }
+    function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active')); document.getElementById(id).classList.add('active'); const tabMap = {'screen-serve':'tab-serve','screen-catch':'tab-catch','screen-spike':'tab-spike','screen-block':'tab-block','screen-sub':'tab-sub'}; if(tabMap[id]) document.getElementById(tabMap[id]).classList.add('active'); }
     function updateUI() { document.getElementById('our-score').innerText = ourScore; document.getElementById('opp-score').innerText = oppScore; document.getElementById('set-counts').innerText = `${setWinOurs} - ${setWinOpp}`; }
     function setSpikeMode(m) { spikeMode = (spikeMode === m) ? 'normal' : m; updateSpikeModeUI(); }
     function toggleTwoStep() { isTwoStepMode = !isTwoStepMode; updateSpikeModeUI(); }
-    function updateSpikeModeUI() { document.getElementById('mode-win').classList.toggle('active-mode', spikeMode === 'win'); document.getElementById('mode-fail').classList.toggle('active-mode', spikeMode === 'fail'); document.getElementById('mode-two-step').classList.toggle('active-mode', isTwoStepMode); }
-    function hitBlockPoint(pos) { stats[courtMembers[pos]].block.win++; score(true); showScreen('screen-serve'); }
+    function updateSpikeModeUI() { document.getElementById('mode-win').style.border = spikeMode === 'win' ? '4px solid black' : ''; document.getElementById('mode-fail').style.border = spikeMode === 'fail' ? '4px solid black' : ''; document.getElementById('mode-two-step').style.border = isTwoStepMode ? '4px solid black' : ''; }
+    function checkSetEnd() { const target = (currentSetNum === 5) ? 15 : 25; const isEnd = (ourScore >= target || oppScore >= target) && Math.abs(ourScore - oppScore) >= 2; document.getElementById('next-set-btn').style.display = isEnd ? 'block' : 'none'; }
+    function openModal(i,k,s){ editPlayerIdx=i; editKey=k; editSubKey=s; document.getElementById('m-player-name').innerText=playerMaster[i].name; document.getElementById('m-item-name').innerText=`${k}(${s})`; document.getElementById('m-current-val').innerText=currentSetStats[i][k][s]; document.getElementById('edit-modal').style.display='flex'; }
+    function openOppMissModal(){ editKey='oppMiss'; document.getElementById('m-player-name').innerText="対戦相手"; document.getElementById('m-item-name').innerText="サーブミス"; document.getElementById('m-current-val').innerText=oppServeMissCount; document.getElementById('edit-modal').style.display='flex'; }
+    function adjustVal(v){ if(editKey==='oppMiss') oppServeMissCount=Math.max(0,oppServeMissCount+v); else currentSetStats[editPlayerIdx][editKey][editSubKey]=Math.max(0,currentSetStats[editPlayerIdx][editKey][editSubKey]+v); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); document.getElementById('m-current-val').innerText = (editKey==='oppMiss') ? oppServeMissCount : currentSetStats[editPlayerIdx][editKey][editSubKey]; }
+    function closeModal(){ document.getElementById('edit-modal').style.display='none'; }
 </script>
 
 </body>
