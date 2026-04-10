@@ -52,6 +52,16 @@
 <body>
 
 <div class="container">
+    <div id="screen-start" class="screen active">
+        <h1>バレーボール分析</h1>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px;">
+            <p>試合IDを入力してください</p>
+            <input type="text" id="match-id-input" placeholder="例: 20240520-A" style="padding: 10px; width: 200px; margin-bottom: 10px;">
+            <br>
+            <button class="char-btn" onclick="initMatch(true)" style="background: #3498db; color: white;">新しく試合を始める</button>
+            <button class="char-btn" onclick="initMatch(false)" style="background: #2ecc71; color: white;">既存の試合を読み込む</button>
+        </div>
+    </div>
     <div id="screen-game-setup" class="screen active hide-on-print">
         <h2>試合基本情報 📝</h2>
         <div class="setup-box">
@@ -84,6 +94,7 @@
             <button id="tab-catch" onclick="showScreen('screen-catch')">レシーブ</button>
             <button id="tab-spike" onclick="showScreen('screen-spike')">スパイク</button>
             <button id="tab-block" onclick="showScreen('screen-block')">ブロック</button>
+            <button id="tab-dig" onclick="showDigScreen()">ディグ</button>
             <button id="tab-sub" style="background:#6c757d; color:white;" onclick="showSubScreen()">交代</button>
         </div>
 
@@ -126,6 +137,15 @@
             <div id="block-grid" class="button-grid"></div>
         </div>
 
+        <div id="screen-dig" class="screen">
+            <h3>ディグ（スパイクレシーブ）</h3>
+            <div id="dig-grid" class="button-grid"></div>
+            <div class="button-grid" style="margin-top:20px;">
+                <button class="char-btn" style="color:#28a745;" onclick="score(true); showScreen('screen-serve')">相手ミス</button>
+                <button class="char-btn" style="color:#dc3545;" onclick="score(false); showScreen('screen-catch')">相手得点</button>
+            </div>
+        </div>
+
         <div id="screen-sub" class="screen">
             <h3>選手交代</h3>
             <div id="sub-out-grid" class="button-grid"></div>
@@ -166,7 +186,34 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+
+    // --- Supabase 接続設定 ---
+    const SUPABASE_URL = "https://taxhylofokuplyoulilt.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_dHqWc7A5EYWHvqnt7fxkQg_GwscaBXO"; 
+
+    // 接続クライアントの作成
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // データをクラウドに飛ばす関数（運び屋）
+    async function sendActionLog(playerNo, type, sub, extra = {}) {
+        if (!currentMatchId) return;
+
+        const { error } = await supabaseClient
+            .from('game_logs')
+            .insert([{
+                match_id: currentMatchId,
+                set_num: currentSetNum,
+                player_no: String(playerNo),
+                action_type: type,
+                action_sub: sub,
+                is_back: extra.isBack || false
+            }]);
+        
+        if (error) console.error("Error saving log:", error);
+    }
+// --------------------------
     let playerMaster = [], allSetsData = [], currentSetNum = 1, setWinOurs = 0, setWinOpp = 0;
     let currentSetStats = [], courtMembers = [-1,-1,-1,-1,-1,-1,-1];
     let ourScore = 0, oppScore = 0, currentServerIdx = 5, hasServeRight = true, spikeMode = 'normal', isTwoStepMode = false;
@@ -180,16 +227,106 @@
     const courtDiv = document.getElementById('court-selection');
     for(let i=0; i<7; i++) courtDiv.innerHTML += `<div><small>${posNames[i]}</small><br><input type="number" class="court-no" style="width:50px;"></div>`;
 
-    function importFromPaste() {
-        const lines = document.getElementById('paste-area').value.trim().split('\n');
-        lines.forEach((l, i) => {
-            const p = l.split(/[\t\s,]+/);
-            if(document.querySelectorAll('.reg-no')[i]) {
-                document.querySelectorAll('.reg-no')[i].value = p[0] || '';
-                document.querySelectorAll('.reg-name')[i].value = p[1] || '';
+    let currentMatchId = "";
+
+    // 試合の初期化処理
+    async function initMatch(isNew) {
+        const idInput = document.getElementById('match-id-input').value.trim();
+        if (!idInput) {
+            alert("試合IDを入力してください");
+            return;
+        }
+        currentMatchId = idInput;
+
+        if (isNew) {
+            // 新規作成：そのままセットアップ画面へ
+            showScreen('screen-game-setup');
+            enableRealtimeSync();
+        } else {
+            // 続きから：Supabaseからデータを取得して状態を復元
+            await loadMatchFromSupabase();
+            enableRealtimeSync();
+        }
+    }
+
+    // Supabaseから過去のログを読み込んで今のスコアやスタッツを再現する
+    async function loadMatchFromSupabase() {
+        const { data, error } = await supabaseClient
+            .from('game_logs')
+            .select('*')
+            .eq('match_id', currentMatchId)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            alert("データの読み込みに失敗しました");
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            alert("該当する試合データ（ID: " + currentMatchId + "）が見つかりません。");
+            return;
+        }
+
+        // --- 状態のリセット ---
+        currentSetStats = createEmptyStats();
+        ourScore = 0;
+        oppScore = 0;
+        oppServeMissCount = 0; // ここを忘れがちです
+
+        // --- ログから全データを再計算 ---
+        data.forEach(log => {
+            // セット数を最新のものに更新
+            currentSetNum = log.set_num;
+
+            // 選手を特定
+            const pIdx = playerMaster.findIndex(p => String(p.no) === String(log.player_no));
+            
+            // 相手のミスなどの特殊ケース（player_noが0やNULLの場合の処理）
+            if (log.action_type === 'opp_error') {
+                oppServeMissCount++;
+                ourScore++;
+                return;
+            }
+
+            if (pIdx === -1) return;
+
+            const type = log.action_type;
+            const sub = log.action_sub;
+
+            // 統計の加算
+            if (type === 'serve') {
+                currentSetStats[pIdx].serve.total++;
+                if (sub === 'ace') { currentSetStats[pIdx].serve.ace++; ourScore++; }
+                else if (sub === 'miss') { currentSetStats[pIdx].serve.miss++; oppScore++; }
+                else if (sub === 'effect') { currentSetStats[pIdx].serve.effect++; }
+            } else if (type === 'receive') {
+                currentSetStats[pIdx].receive.total++;
+                if (sub === 'A') currentSetStats[pIdx].receive.A++;
+                else if (sub === 'B') currentSetStats[pIdx].receive.B++;
+                else if (sub === 'C') currentSetStats[pIdx].receive.C++;
+                else if (sub === 'fail') { currentSetStats[pIdx].receive.fail++; oppScore++; }
+            } else if (type === 'spike') {
+                currentSetStats[pIdx].spike.total++;
+                if (sub === 'win') { currentSetStats[pIdx].spike.win++; ourScore++; }
+                else if (sub === 'fail') { currentSetStats[pIdx].spike.fail++; oppScore++; }
+            } else if (type === 'dig') {
+                if (sub === 'success') currentSetStats[pIdx].dig.success++;
+                else if (sub === 'fail') { currentSetStats[pIdx].dig.fail++; oppScore++; }
+            } else if (type === 'block') {
+                if (sub === 'win') { currentSetStats[pIdx].block.win++; ourScore++; }
             }
         });
+
+        // --- 画面表示の更新 ---
+        updateUI(); // スコア表示などを更新
+        renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount);
+        showScreen('screen-serve'); // 記録画面へジャンプ
+        alert(`試合ID: ${currentMatchId} のデータを ${data.length} 件復元しました`);
+        
+        enableRealtimeSync(); 
     }
+
+
 
     function showSetSetup() {
         document.getElementById('screen-game-setup').classList.remove('active');
@@ -204,9 +341,86 @@
             receive:{total:0, A:0, B:0, C:0, fail:0},
             spike:{win:0, fail:0, total:0, backCount:0},
             twoStep:{win:0, fail:0, total:0},
+            dig:{success:0, fail:0},
             block:{win:0}
         }));
     }
+
+    // ディグ画面を表示し、ボタンを生成する
+    // ディグ画面の表示を修正
+    function showDigScreen() {
+        const grid = document.getElementById('dig-grid');
+        grid.innerHTML = "";
+        
+        courtMembers.forEach((idx, i) => {
+            if(idx === -1) return;
+            
+            // ボタンのHTML
+            grid.innerHTML += `
+                <button class="char-btn" 
+                    id="dig-btn-${i}"
+                    onmousedown="startDigTimer(${i})" 
+                    onmouseup="clearDigTimer(${i})" 
+                    ontouchstart="startDigTimer(${i})" 
+                    ontouchend="clearDigTimer(${i})"
+                    style="user-select: none;">
+                    ${playerMaster[idx].name}
+                </button>`;
+        });
+        showScreen('screen-dig');
+    }
+
+    let digTimers = {}; // 各ボタンのタイマーを管理
+
+    function startDigTimer(posIdx) {
+        // 念のため既存のタイマーをクリア
+        clearDigTimer(posIdx);
+
+        // ボタンの色を少し変えて「長押し中」を視覚的に見せる（任意）
+        document.getElementById(`dig-btn-${posIdx}`).style.background = "#ffeb3b";
+
+        digTimers[posIdx] = setTimeout(() => {
+            // --- 3秒経過：ミスとして記録 ---
+            recordDig(posIdx, 'fail');
+            delete digTimers[posIdx];
+        }, 3000); // ここで秒数を調整できます（例: 1000なら1秒）
+    }
+
+    function clearDigTimer(posIdx) {
+        if (digTimers[posIdx]) {
+            clearTimeout(digTimers[posIdx]);
+            delete digTimers[posIdx];
+            
+            // 3秒経たずに離した場合：成功として記録
+            recordDig(posIdx, 'success');
+        }
+        // 色を元に戻す
+        const btn = document.getElementById(`dig-btn-${posIdx}`);
+        if(btn) btn.style.background = "white";
+    }
+
+    // 記録とSupabase送信
+    async function recordDig(posIdx, type) {
+    saveState();
+    const playerIdx = courtMembers[posIdx];
+    if (playerIdx === undefined) return;
+
+    // 手元のデータを更新
+    currentSetStats[playerIdx].dig[type]++;
+
+    // Supabaseへ送信
+    await sendActionLog(playerMaster[playerIdx].no, 'dig', type);
+
+    // 画面遷移
+    if (type === 'fail') {
+        score(false);
+        showScreen('screen-catch');
+    } else {
+        showScreen('screen-spike');
+    }
+
+    renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount);
+}
 
     function startSet(mode) {
         if(allSetsData.length === 0) {
@@ -290,11 +504,11 @@
 
     function renderTable(containerId, statsData, oppMiss, isTotal = false) {
         let html = `<table><thead>
-            <tr><th rowspan="2">名前</th><th colspan="5">サーブ</th><th colspan="5">レシーブ</th><th colspan="6">スパイク</th><th>B</th></tr>
+            <tr><th rowspan="2">名前</th><th colspan="5">サーブ</th><th colspan="5">レシーブ</th><th colspan="6">スパイク</th><th colspan="2">ディグ</th><th>B</th></tr>
             <tr style="font-size:0.5rem;">
                 <td>計</td><td>A</td><td>効</td><td>失</td><td>効果率</td>
                 <td>A</td><td>B</td><td>C</td><td>失</td><td>成功率</td>
-                <td>決</td><td>失</td><td>計</td><td>バック</td><td>2段</td><td>効果率</td><td>得点</td>
+                <td>決</td><td>失</td><td>計</td><td>バック</td><td>2段</td><td>効果率</td><td>成功</td><td>ミス</td><td>得点</td>
             </tr>
             </thead><tbody>`;
         
@@ -307,6 +521,7 @@
                 ${isTotal ? td(p.serve.total) : c(i,'serve','total')}${isTotal ? td(p.serve.ace) : c(i,'serve','ace')}${isTotal ? td(p.serve.effect) : c(i,'serve','effect')}${isTotal ? td(p.serve.miss) : c(i,'serve','miss')}<td class="calc-cell">${svEff}%</td>
                 ${isTotal ? td(p.receive.A) : c(i,'receive','A')}${isTotal ? td(p.receive.B) : c(i,'receive','B')}${isTotal ? td(p.receive.C) : c(i,'receive','C')}${isTotal ? td(p.receive.fail) : c(i,'receive','fail')}<td class="calc-cell">${rcRate}%</td>
                 ${isTotal ? td(p.spike.win) : c(i,'spike','win')}${isTotal ? td(p.spike.fail) : c(i,'spike','fail')}${isTotal ? td(p.spike.total) : c(i,'spike','total')}${isTotal ? td(p.spike.backCount) : c(i,'spike','backCount')}${isTotal ? td(p.twoStep.total) : c(i,'twoStep','total')}<td class="calc-cell">${spEff}%</td>
+                ${isTotal ? td(p.dig.success) : c(i,'dig','success')}${isTotal ? td(p.dig.fail) : c(i,'dig','fail')}
                 ${isTotal ? td(p.block.win) : c(i,'block','win')}</tr>`;
         });
         html += `<tr style="background:#f9f9f9; font-weight:bold;"><td colspan="5">相手サーブミス</td><td class="${isTotal?'':'edit-cell'}" onclick="${isTotal?'':'openOppMissModal()'}">${oppMiss}</td><td colspan="11"></td></tr></tbody></table>`;
@@ -321,18 +536,95 @@
     function undo() { if(actionHistory.length === 0) return; const last = JSON.parse(actionHistory.pop()); currentSetStats = last.stats; courtMembers = last.courtMembers; ourScore = last.ourScore; oppScore = last.oppScore; hasServeRight = last.hasServeRight; currentServerIdx = last.currentServerIdx; oppServeMissCount = last.oppServeMissCount; const tlId = `timeline-set-${currentSetNum}`; const ours = document.getElementById(`ours-${tlId}`), opp = document.getElementById(`opp-${tlId}`); if(ours.lastChild && ours.lastChild.className !== "row-label") { ours.removeChild(ours.lastChild); opp.removeChild(opp.lastChild); } updateUI(); refreshInterface(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
     function score(ours) { saveState(); if(ours) { ourScore++; if(!hasServeRight) { currentServerIdx = (currentServerIdx + 1) % 6; hasServeRight = true; } } else { oppScore++; hasServeRight = false; } updateUI(); updateTimeline(ours); checkSetEnd(); refreshInterface(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
     function updateTimeline(ours) { const tlId = `timeline-set-${currentSetNum}`; const dot = `<div class="point-dot ${ours ? 'dot-ours' : 'dot-opp'}">${ours ? ourScore : oppScore}</div>`; document.getElementById(`ours-${tlId}`).innerHTML += ours ? dot : '<div class="spacer"></div>'; document.getElementById(`opp-${tlId}`).innerHTML += ours ? '<div class="spacer"></div>' : dot; }
-    function recordServe(type) { saveState(); const sIdx = courtMembers[serveOrder[currentServerIdx]]; currentSetStats[sIdx].serve.total++; if(type === 'ace') { currentSetStats[sIdx].serve.ace++; score(true); showScreen('screen-serve'); } else if(type === 'effect') { currentSetStats[sIdx].serve.effect++; showScreen('screen-spike'); } else if(type === 'miss') { currentSetStats[sIdx].serve.miss++; score(false); showScreen('screen-catch'); } else showScreen('screen-spike'); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
+    async function recordServe(type) { saveState(); const sIdx = courtMembers[serveOrder[currentServerIdx]];const player = playerMaster[sIdx]; currentSetStats[sIdx].serve.total++;await sendActionLog(player.no, 'serve', type); if(type === 'ace') { currentSetStats[sIdx].serve.ace++; score(true); showScreen('screen-serve'); } else if(type === 'effect') { currentSetStats[sIdx].serve.effect++; showScreen('screen-spike'); } else if(type === 'miss') { currentSetStats[sIdx].serve.miss++; score(false); showScreen('screen-catch'); } else showScreen('screen-spike'); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
     function recordOppServeMiss() { saveState(); oppServeMissCount++; score(true); showScreen('screen-serve'); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
     function recordOppAce() { saveState(); oppScore++; updateUI(); updateTimeline(false); checkSetEnd(); refreshInterface(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
-    function completeReceive() { saveState(); courtMembers.forEach((idx, i) => { const btn = document.getElementById(`cbtn-${i}`); if(!btn) return; const val = btn.innerText; if(val !== playerMaster[idx].name) { currentSetStats[idx].receive.total++; if(val === 'A') currentSetStats[idx].receive.A++; else if(val === 'B') currentSetStats[idx].receive.B++; else if(val === 'C') currentSetStats[idx].receive.C++; else if(val === '失') { currentSetStats[idx].receive.fail++; score(false); showScreen('screen-catch'); return; } } }); showScreen('screen-spike'); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
-    function hitSpike(pos, isBack) { saveState(); const sIdx = courtMembers[pos]; currentSetStats[sIdx].spike.total++; if(isBack) currentSetStats[sIdx].spike.backCount++; if(isTwoStepMode) { currentSetStats[sIdx].twoStep.total++; if(spikeMode === 'win') { currentSetStats[sIdx].twoStep.win++; score(true); showScreen('screen-serve'); } else if(spikeMode === 'fail') { currentSetStats[sIdx].twoStep.fail++; score(false); showScreen('screen-catch'); } } else { if(spikeMode === 'win') { currentSetStats[sIdx].spike.win++; score(true); showScreen('screen-serve'); } else if(spikeMode === 'fail') { currentSetStats[sIdx].spike.fail++; score(false); showScreen('screen-catch'); } } spikeMode = 'normal'; isTwoStepMode = false; updateSpikeModeUI(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); }
-    function hitBlockPoint(pos) { saveState(); currentSetStats[courtMembers[pos]].block.win++; score(true); showScreen('screen-serve'); }
+    async function completeReceive() {
+        saveState();
+        // Promise.all を使って全員分を並列で送ると効率的です
+        const promises = [];
+
+        courtMembers.forEach((idx, i) => {
+            const btn = document.getElementById(`cbtn-${i}`);
+            if(!btn) return;
+            const val = btn.innerText;
+            
+            // 名前以外の値（A, B, C, 失）になっていれば送信
+            if(val !== playerMaster[idx].name) {
+                currentSetStats[idx].receive.total++;
+                let type = '';
+                if(val === 'A') { currentSetStats[idx].receive.A++; type = 'A'; }
+                else if(val === 'B') { currentSetStats[idx].receive.B++; type = 'B'; }
+                else if(val === 'C') { currentSetStats[idx].receive.C++; type = 'C'; }
+                else if(val === '失') { currentSetStats[idx].receive.fail++; type = 'fail'; }
+                
+                // --- 同期処理を予約 ---
+                promises.push(sendActionLog(playerMaster[idx].no, 'receive', type));
+
+                if(type === 'fail') {
+                    score(false);
+                    showScreen('screen-catch');
+                }
+            }
+        });
+        
+        await Promise.all(promises); // 全員の送信が終わるまで待機
+        showScreen('screen-spike');
+        renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount);
+    }
+    async function hitSpike(pos, isBack) {
+        saveState();
+        const sIdx = courtMembers[pos];
+        const player = playerMaster[sIdx];
+        
+        currentSetStats[sIdx].spike.total++;
+        if(isBack) currentSetStats[sIdx].spike.backCount++;
+
+        let actionSub = spikeMode; // 'win', 'fail', 'normal'
+        if(isTwoStepMode) {
+            currentSetStats[sIdx].twoStep.total++;
+            if(spikeMode === 'win') currentSetStats[sIdx].twoStep.win++;
+            else if(spikeMode === 'fail') currentSetStats[sIdx].twoStep.fail++;
+            actionSub = `2step-${spikeMode}`; // 2段トスの場合の区別
+        }
+
+        // --- 同期処理を追加 ---
+        await sendActionLog(player.no, 'spike', actionSub, { isBack: isBack });
+
+        if(spikeMode === 'win') {
+            currentSetStats[sIdx].spike.win++;
+            score(true);
+            showScreen('screen-serve');
+        } else if(spikeMode === 'fail') {
+            currentSetStats[sIdx].spike.fail++;
+            score(false);
+            showScreen('screen-catch');
+        }
+        
+        spikeMode = 'normal';
+        isTwoStepMode = false;
+        updateSpikeModeUI();
+        renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount);
+    }
+    async function hitBlockPoint(pos) {
+        saveState();
+        const sIdx = courtMembers[pos];
+        const player = playerMaster[sIdx];
+
+        currentSetStats[sIdx].block.win++;
+
+        // --- 同期処理を追加 ---
+        await sendActionLog(player.no, 'block', 'win');
+
+        score(true);
+        showScreen('screen-serve');
+    }
     function showSubScreen() { subOutPos = -1; document.getElementById('sub-in-section').style.display = 'none'; const outGrid = document.getElementById('sub-out-grid'); outGrid.innerHTML = ""; courtMembers.forEach((idx, i) => { if(idx !== -1) outGrid.innerHTML += `<button class="char-btn" onclick="selectSubOut(${i})">${posNames[i]}<br>${playerMaster[idx].name}</button>`; }); showScreen('screen-sub'); }
     function selectSubOut(pos) { subOutPos = pos; document.getElementById('sub-in-section').style.display = 'block'; const inGrid = document.getElementById('sub-in-grid'); inGrid.innerHTML = ""; playerMaster.forEach((s, idx) => { if(!courtMembers.includes(idx)) inGrid.innerHTML += `<button class="char-btn" onclick="executeSub(${idx})">No.${s.no}<br>${s.name}</button>`; }); }
     function executeSub(newIdx) { saveState(); courtMembers[subOutPos] = newIdx; refreshInterface(); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); showScreen('screen-spike'); }
     function refreshInterface() { const sd = document.getElementById('spike-grid'), cd = document.getElementById('catch-players'), bd = document.getElementById('block-grid'); sd.innerHTML = ""; cd.innerHTML = ""; bd.innerHTML = ""; const fIdxs = [(currentServerIdx + 1) % 6, (currentServerIdx + 2) % 6, (currentServerIdx + 3) % 6]; const fPos = fIdxs.map(idx => serveOrder[idx]); courtMembers.forEach((idx, i) => { if(idx === -1) return; const isBack = (i === 6) || !fPos.includes(i); sd.innerHTML += `<button class="char-btn" onclick="hitSpike(${i}, ${isBack})">${playerMaster[idx].name}${isBack ? '<br><small>(Back)</small>' : ''}</button>`; cd.innerHTML += `<button class="char-btn" id="cbtn-${i}" onclick="toggleRec(${i})">${playerMaster[idx].name}</button>`; if(!isBack) bd.innerHTML += `<button class="char-btn" onclick="hitBlockPoint(${i})">${playerMaster[idx].name}</button>`; }); document.getElementById('serve-title').innerText = `サーバー: ${playerMaster[courtMembers[serveOrder[currentServerIdx]]].name}`; }
     function toggleRec(pos) { const btn = document.getElementById(`cbtn-${pos}`), name = playerMaster[courtMembers[pos]].name; const opts = [name, 'A', 'B', 'C', '失']; btn.innerText = opts[(opts.indexOf(btn.innerText) + 1) % opts.length]; }
-    function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active')); document.getElementById(id).classList.add('active'); const tabMap = {'screen-serve':'tab-serve','screen-catch':'tab-catch','screen-spike':'tab-spike','screen-block':'tab-block','screen-sub':'tab-sub'}; if(tabMap[id]) document.getElementById(tabMap[id]).classList.add('active'); }
+    function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active')); document.getElementById(id).classList.add('active'); const tabMap = {'screen-serve':'tab-serve','screen-catch':'tab-catch','screen-dig':'tab-dig','screen-spike':'tab-spike','screen-block':'tab-block','screen-sub':'tab-sub'}; if(tabMap[id]) document.getElementById(tabMap[id]).classList.add('active'); }
     function updateUI() { document.getElementById('our-score').innerText = ourScore; document.getElementById('opp-score').innerText = oppScore; document.getElementById('set-counts').innerText = `${setWinOurs} - ${setWinOpp}`; }
     function setSpikeMode(m) { spikeMode = (spikeMode === m) ? 'normal' : m; updateSpikeModeUI(); }
     function toggleTwoStep() { isTwoStepMode = !isTwoStepMode; updateSpikeModeUI(); }
@@ -342,6 +634,49 @@
     function openOppMissModal(){ editKey='oppMiss'; document.getElementById('m-player-name').innerText="対戦相手"; document.getElementById('m-item-name').innerText="サーブミス"; document.getElementById('m-current-val').innerText=oppServeMissCount; document.getElementById('edit-modal').style.display='flex'; }
     function adjustVal(v){ if(editKey==='oppMiss') oppServeMissCount=Math.max(0,oppServeMissCount+v); else currentSetStats[editPlayerIdx][editKey][editSubKey]=Math.max(0,currentSetStats[editPlayerIdx][editKey][editSubKey]+v); renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount); document.getElementById('m-current-val').innerText = (editKey==='oppMiss') ? oppServeMissCount : currentSetStats[editPlayerIdx][editKey][editSubKey]; }
     function closeModal(){ document.getElementById('edit-modal').style.display='none'; }
+
+    // Supabaseのリアルタイム更新を監視する
+    function enableRealtimeSync() {
+        if (!currentMatchId) return;
+
+        supabaseClient
+            .channel('game_logs_sync')
+            .on('postgres_changes', 
+                { 
+                    event: 'INSERT', 
+                    schema: 'public', 
+                    table: 'game_logs', 
+                    filter: `match_id=eq.${currentMatchId}` 
+                }, 
+                (payload) => {
+                    console.log('他デバイスからの入力を検知:', payload.new);
+                    // 届いたデータを元に再計算して画面を更新
+                    applySingleLog(payload.new);
+                }
+            )
+            .subscribe();
+    }
+
+    // 届いた1件のデータを今のスタッツに反映させる
+    function applySingleLog(log) {
+        const pIdx = playerMaster.findIndex(p => String(p.no) === String(log.player_no));
+        if (pIdx === -1) return;
+
+        const type = log.action_type;
+        const sub = log.action_sub;
+
+        // スタッツ加算（自分自身の入力も届くので、重複に注意が必要ですが、まずはシンプルに）
+        // 実際には、自分の入力以外を反映させる処理が理想的です
+        if (type === 'serve') {
+            currentSetStats[pIdx].serve.total++;
+            if (sub === 'ace') { currentSetStats[pIdx].serve.ace++; ourScore++; }
+            if (sub === 'miss') { currentSetStats[pIdx].serve.miss++; oppScore++; }
+        }
+        // ...他のアクションも同様に記述
+
+        updateUI();
+        renderTable(`table-timeline-set-${currentSetNum}`, currentSetStats, oppServeMissCount);
+    }
 </script>
 
 </body>
